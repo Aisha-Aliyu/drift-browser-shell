@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "DRIFT Browser",
   description: "A classy, modern personal browser shell.",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/public/favicon.svg" },
 };
 
 export const viewport: Viewport = {
