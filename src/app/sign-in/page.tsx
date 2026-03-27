@@ -163,6 +163,13 @@ export default function SignInPage() {
                 boxShadow: "0 4px 20px rgba(44,93,169,0.5)",
                 color: "#ffffff",
               },
+              footer: {
+                background: "transparent",
+                borderTop: "1px solid rgba(200,218,249,0.08)",
+              },
+              footerAction: {
+                background: "transparent",
+              },
               footerActionText: {
                 color: "rgba(200,218,249,0.6)",
                 fontSize: "13px",
@@ -172,20 +179,17 @@ export default function SignInPage() {
                 fontWeight: "600",
                 fontSize: "13px",
               },
-              // Move footer content into card body
-              footerAction: {
-                borderTop: "1px solid rgba(200,218,249,0.08)",
-                marginTop: "20px",
-                paddingTop: "20px",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: "6px",
+             footerPages: {
+                background: "transparent",
               },
-              // Hide the Clerk footer with development mode
-              footer: {
+            footerPagesLink: {
                 display: "none",
               },
+            internal: {
+                display: "none",
+              },
+    
+        
               identityPreviewText: {
                 color: "rgba(200,218,249,0.8)",
               },
