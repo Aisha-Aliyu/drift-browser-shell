@@ -28,18 +28,6 @@ export default function SignInPage() {
         pointerEvents: "none",
       }} />
 
-      {/* Bottom glow */}
-      <div style={{
-        position: "absolute",
-        bottom: "-100px",
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: "400px",
-        height: "300px",
-        background: "radial-gradient(ellipse at 50% 80%, rgba(200,218,249,0.06) 0%, transparent 70%)",
-        pointerEvents: "none",
-      }} />
-
       {/* Grid */}
       <div style={{
         position: "absolute",
@@ -61,7 +49,6 @@ export default function SignInPage() {
         marginBottom: "32px",
         gap: "12px",
       }}>
-        {/* Logo mark */}
         <div style={{
           width: "56px",
           height: "56px",
@@ -78,7 +65,6 @@ export default function SignInPage() {
             <circle cx="11" cy="16" r="1.6" fill="white" />
           </svg>
         </div>
-
         <div style={{ textAlign: "center" }}>
           <h1 style={{
             fontFamily: "'DM Serif Display', Georgia, serif",
@@ -88,15 +74,12 @@ export default function SignInPage() {
             margin: 0,
             fontWeight: 400,
             lineHeight: 1,
-          }}>
-            DRIFT
-          </h1>
+          }}>DRIFT</h1>
           <p style={{
             fontSize: "14px",
             color: "rgba(200,218,249,0.6)",
             marginTop: "8px",
             fontFamily: "'DM Sans', sans-serif",
-            letterSpacing: "0.01em",
           }}>
             Sign in to sync your browser across devices
           </p>
@@ -128,7 +111,7 @@ export default function SignInPage() {
                 border: "1px solid rgba(200,218,249,0.15)",
                 boxShadow: "0 0 0 1px rgba(44,93,169,0.2), 0 32px 80px rgba(8,13,46,0.8)",
                 borderRadius: "24px",
-                padding: "32px 28px",
+                padding: "32px 28px 24px 28px",
               },
               headerTitle: {
                 color: "#ffffff",
@@ -180,9 +163,6 @@ export default function SignInPage() {
                 boxShadow: "0 4px 20px rgba(44,93,169,0.5)",
                 color: "#ffffff",
               },
-              footer: {
-               display: "none",
-              },
               footerActionText: {
                 color: "rgba(200,218,249,0.6)",
                 fontSize: "13px",
@@ -191,6 +171,20 @@ export default function SignInPage() {
                 color: "#93c5fd",
                 fontWeight: "600",
                 fontSize: "13px",
+              },
+              // Move footer content into card body
+              footerAction: {
+                borderTop: "1px solid rgba(200,218,249,0.08)",
+                marginTop: "20px",
+                paddingTop: "20px",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "6px",
+              },
+              // Hide the Clerk footer with development mode
+              footer: {
+                display: "none",
               },
               identityPreviewText: {
                 color: "rgba(200,218,249,0.8)",
@@ -218,11 +212,11 @@ export default function SignInPage() {
         />
       </div>
 
-      {/* Footer */}
+      {/* Bottom label */}
       <p style={{
         position: "relative",
         zIndex: 10,
-        marginTop: "28px",
+        marginTop: "24px",
         fontSize: "11px",
         color: "rgba(200,218,249,0.2)",
         fontFamily: "'DM Sans', sans-serif",
