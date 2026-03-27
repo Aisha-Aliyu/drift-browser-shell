@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: #0a0f3c;
+  color: #c8daf9;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(44,93,169,0.4); border-radius: 99px; }
+::selection { background: rgba(44,93,169,0.45); color: #f4f8ff; }
+:focus-visible { outline: 2px solid rgba(44,93,169,0.8); outline-offset: 2px; border-radius: 4px; }
+
+@layer utilities {
+  .glass {
+    background: rgba(26,40,104,0.55);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(200,218,249,0.08);
+  }
+  .glass-light {
+    background: rgba(44,93,169,0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(200,218,249,0.1);
+  }
+  .no-select { user-select: none; -webkit-user-select: none; }
+  .tab-strip-bg {
+    background: linear-gradient(180deg,#0d1347 0%,#0a0f3c 100%);
+    border-bottom: 1px solid rgba(200,218,249,0.05);
+  }
+  .url-bar-bg {
+    background: linear-gradient(180deg,#111a54 0%,#0d1347 100%);
+    border-bottom: 1px solid rgba(200,218,249,0.04);
+  }
+}
+
+#browser-viewport {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+#browser-viewport iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  transform-origin: top left;
+}
+
+@keyframes loadBar {
+  0%   { width: 0%;   opacity: 1; }
+  60%  { width: 75%;  opacity: 1; }
+  95%  { width: 95%;  opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.load-bar {
+  height: 2px;
+  background: linear-gradient(90deg,#2c5da9,#c8daf9,#2c5da9);
+  background-size: 200% 100%;
+  animation: loadBar 1.6s ease forwards, shimmer 1s linear infinite;
+  position: absolute;
+  bottom: 0; left: 0;
+  border-radius: 0 2px 2px 0;
+  z-index: 10;
+}
+
+/* Hide scrollbar on tab strip but keep it scrollable */
+.tab-scroll {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+  min-width: 0;
+}
+.tab-scroll::-webkit-scrollbar { display: none; }
