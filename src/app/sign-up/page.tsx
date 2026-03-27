@@ -178,6 +178,9 @@ export default function SignUpPage() {
                 boxShadow: "0 4px 20px rgba(44,93,169,0.5)",
                 color: "#ffffff",
               },
+              footer: {
+                display: "none",
+              },
               footerActionText: {
                 color: "rgba(200,218,249,0.6)",
                 fontSize: "13px",
