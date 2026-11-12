@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useBrowser } from "@/context/BrowserContext";
 import { toDisplayUrl, getFaviconUrl, extractHostname, NEW_TAB_URL } from "@/lib/url";
-import { canShowInFrame, needsFrameCheck } from "@/lib/frameCheck";
+import { canShowInFrame, knownFrameResult } from "@/lib/frameCheck";
 import NewTabPage from "./NewTabPage";
 import ErrorPage from "./ErrorPage";
 import BlockedPage from "./BlockedPage";
@@ -52,16 +52,17 @@ function IframeRenderer({
   const [iframeReady, setIframeReady] = useState(false);
   const [frameCheck, setFrameCheck] = useState<{ url: string; embeddable: boolean } | null>(null);
 
-  // Sites that refuse to be framed load as a blank page, so ask the server before loading them
-  const checkNeeded = needsFrameCheck(url);
-  let status: FrameStatus = "ok";
-  if (checkNeeded) {
-    if (!frameCheck || frameCheck.url !== url) status = "checking";
-    else if (!frameCheck.embeddable) status = "blocked";
-  }
+  // Sites that refuse to be framed load as a blank page, so check before loading them.
+  // Known sites are decided straight away, others are asked of the server. Worked out once
+  // per address, so a later cache change can't reload a page that is already showing.
+  const known = useMemo(() => knownFrameResult(url), [url]);
+  let status: FrameStatus;
+  if (known !== null) status = known ? "ok" : "blocked";
+  else if (!frameCheck || frameCheck.url !== url) status = "checking";
+  else status = frameCheck.embeddable ? "ok" : "blocked";
 
   useEffect(() => {
-    if (!checkNeeded) return;
+    if (known !== null) return;
     let cancelled = false;
     canShowInFrame(url).then((embeddable) => {
       if (!cancelled) setFrameCheck({ url, embeddable });
@@ -69,7 +70,7 @@ function IframeRenderer({
     return () => {
       cancelled = true;
     };
-  }, [url, checkNeeded]);
+  }, [url, known]);
 
   // The blocked page stands in for the site, so finish loading and record the visit
   useEffect(() => {

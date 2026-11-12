@@ -47,16 +47,49 @@ function withFrameMode(url: string): string {
   }
 }
 
+// Popular sites that refuse to be shown inside a frame, so DRIFT can say so straight away
+// without asking the server
+const KNOWN_BLOCKED_HOSTS = new Set([
+  "github.com", "www.github.com", "gist.github.com",
+  "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+  "linkedin.com", "www.linkedin.com",
+  "reddit.com", "www.reddit.com", "old.reddit.com",
+  "news.ycombinator.com",
+  "developer.mozilla.org",
+  "x.com", "twitter.com",
+  "facebook.com", "www.facebook.com", "m.facebook.com",
+  "instagram.com", "www.instagram.com",
+  "duckduckgo.com",
+  "stackoverflow.com",
+  "amazon.com", "www.amazon.com",
+  "netflix.com", "www.netflix.com",
+]);
+
+export function isKnownBlocked(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (u.protocol === "https:" || u.protocol === "http:") && KNOWN_BLOCKED_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const YOUTUBE_EMBED_HOSTS = new Set([
+  "youtube.com", "www.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com",
+]);
+
 // Pages that are known to work inside a frame, so DRIFT can skip the server check
 export function isKnownEmbeddable(url: string): boolean {
   try {
     const u = new URL(url);
-    return (
-      u.protocol === "https:" &&
+    if (u.protocol !== "https:") return false;
+    const googleFrameMode =
       (u.hostname === "www.google.com" || u.hostname === "google.com") &&
       ["/", "/search", "/webhp"].includes(u.pathname) &&
-      u.searchParams.get("igu") === "1"
-    );
+      u.searchParams.get("igu") === "1";
+    // YouTube's embed player is made to be shown inside other sites
+    const youtubeEmbed = YOUTUBE_EMBED_HOSTS.has(u.hostname) && u.pathname.startsWith("/embed/");
+    return googleFrameMode || youtubeEmbed;
   } catch {
     return false;
   }

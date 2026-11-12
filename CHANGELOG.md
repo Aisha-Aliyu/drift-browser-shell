@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.2] - 2026-11-12
+
+### Fixed
+- Popular sites that block frames, such as GitHub, YouTube, Reddit and LinkedIn, show the "Open in new tab" page straight away instead of a blank page.
+- The frame check keeps working when the Upstash rate limiter can't be reached, using limits kept on each server instance instead.
+- The frame check falls back to the system DNS lookup when Node's DNS resolver can't reach a nameserver.
+
+### Changed
+- The frame check can be opened directly in a browser for troubleshooting, and its errors say what went wrong.
+
+---
+
 ## [1.0.1] - 2026-11-12
 
 ### Fixed
