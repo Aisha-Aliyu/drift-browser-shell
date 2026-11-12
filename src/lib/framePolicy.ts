@@ -64,23 +64,31 @@ export function isBlockedAddress(ip: string): boolean {
 }
 
 const PROBE_HOST = "github.com";
-let resolverUsable: Promise<boolean> | null = null;
+const RESOLVER_RECHECK_MS = 5 * 60_000;
+let resolverProbe: Promise<boolean> | null = null;
+let resolverFailedAt = 0;
 
 // Node's DNS resolver avoids the small thread pool that the system lookup runs on, but some
-// hosting setups don't let it reach a nameserver. Check once with a well-known name and use
-// the system lookup when it can't.
+// hosting setups don't let it reach a nameserver. Check with a well-known name and use the
+// system lookup when it can't, trying the resolver again every few minutes.
 function resolverWorks(): Promise<boolean> {
-  if (!resolverUsable) {
+  const recheck = resolverFailedAt > 0 && Date.now() - resolverFailedAt > RESOLVER_RECHECK_MS;
+  if (!resolverProbe || recheck) {
+    resolverFailedAt = 0;
     const probe = new dns.promises.Resolver({ timeout: DNS_TIMEOUT_MS, tries: 1 });
-    resolverUsable = probe.resolve4(PROBE_HOST).then(
-      (found) => found.length > 0,
+    resolverProbe = probe.resolve4(PROBE_HOST).then(
+      (found) => {
+        if (found.length === 0) resolverFailedAt = Date.now();
+        return found.length > 0;
+      },
       (err: unknown) => {
         console.error("[frame-check] DNS resolver unavailable, using the system lookup", err);
+        resolverFailedAt = Date.now();
         return false;
       }
     );
   }
-  return resolverUsable;
+  return resolverProbe;
 }
 
 // Settles with the promise, or rejects as soon as the deadline passes
@@ -135,9 +143,8 @@ async function resolveWithSystem(host: string, signal: AbortSignal): Promise<Add
 // Uses IPv4 addresses when a host has them, and IPv6 only for hosts that have no IPv4
 async function resolveAll(host: string, signal: AbortSignal): Promise<Address[]> {
   if (signal.aborted) throw new Error("Timed out");
-  return (await resolverWorks())
-    ? resolveWithResolver(host, signal)
-    : resolveWithSystem(host, signal);
+  const useResolver = await withDeadline(resolverWorks(), signal);
+  return useResolver ? resolveWithResolver(host, signal) : resolveWithSystem(host, signal);
 }
 
 // Returns the URL only when it is http or https on a standard port and every address

@@ -12,20 +12,27 @@ function fail(status: number, reason: string) {
   return NextResponse.json({ error: reason }, { status });
 }
 
+// After Upstash fails, skip it for a minute so later requests don't wait on it again
+const UPSTASH_RETRY_MS = 60_000;
+let upstashDownUntil = 0;
+
 // Uses the shared Upstash limits. If Upstash fails or doesn't answer in time, it falls back
 // to limits kept on this server instance, so the check never runs unlimited.
 async function withinLimits(ip: string): Promise<{ allowed: boolean; shared: boolean }> {
-  try {
-    const perVisitor = await frameCheckLimiter.limit(ip);
-    if (perVisitor.reason !== "timeout") {
-      if (!perVisitor.success) return { allowed: false, shared: true };
-      // Checked second, so one busy visitor can't use up everyone's budget
-      const overall = await frameCheckGlobalLimiter.limit("all");
-      if (overall.reason !== "timeout") return { allowed: overall.success, shared: true };
+  if (Date.now() >= upstashDownUntil) {
+    try {
+      const perVisitor = await frameCheckLimiter.limit(ip);
+      if (perVisitor.reason !== "timeout") {
+        if (!perVisitor.success) return { allowed: false, shared: true };
+        // Checked second, so one busy visitor can't use up everyone's budget
+        const overall = await frameCheckGlobalLimiter.limit("all");
+        if (overall.reason !== "timeout") return { allowed: overall.success, shared: true };
+      }
+      console.error("[frame-check] Upstash rate limiter timed out, using local limits");
+    } catch (err) {
+      console.error("[frame-check] Upstash rate limiter failed, using local limits", err);
     }
-    console.error("[frame-check] Upstash rate limiter timed out, using local limits");
-  } catch (err) {
-    console.error("[frame-check] Upstash rate limiter failed, using local limits", err);
+    upstashDownUntil = Date.now() + UPSTASH_RETRY_MS;
   }
   const allowed =
     localLimit(`ip:${ip}`, PER_VISITOR_PER_MINUTE) && localLimit("all", OVERALL_PER_MINUTE);

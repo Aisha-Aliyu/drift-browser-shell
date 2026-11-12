@@ -74,16 +74,22 @@ export function isKnownBlocked(url: string): boolean {
   }
 }
 
+const YOUTUBE_EMBED_HOSTS = new Set([
+  "youtube.com", "www.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com",
+]);
+
 // Pages that are known to work inside a frame, so DRIFT can skip the server check
 export function isKnownEmbeddable(url: string): boolean {
   try {
     const u = new URL(url);
-    return (
-      u.protocol === "https:" &&
+    if (u.protocol !== "https:") return false;
+    const googleFrameMode =
       (u.hostname === "www.google.com" || u.hostname === "google.com") &&
       ["/", "/search", "/webhp"].includes(u.pathname) &&
-      u.searchParams.get("igu") === "1"
-    );
+      u.searchParams.get("igu") === "1";
+    // YouTube's embed player is made to be shown inside other sites
+    const youtubeEmbed = YOUTUBE_EMBED_HOSTS.has(u.hostname) && u.pathname.startsWith("/embed/");
+    return googleFrameMode || youtubeEmbed;
   } catch {
     return false;
   }

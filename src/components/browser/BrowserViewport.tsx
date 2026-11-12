@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useBrowser } from "@/context/BrowserContext";
 import { toDisplayUrl, getFaviconUrl, extractHostname, NEW_TAB_URL } from "@/lib/url";
 import { canShowInFrame, knownFrameResult } from "@/lib/frameCheck";
@@ -53,8 +53,9 @@ function IframeRenderer({
   const [frameCheck, setFrameCheck] = useState<{ url: string; embeddable: boolean } | null>(null);
 
   // Sites that refuse to be framed load as a blank page, so check before loading them.
-  // Known sites are decided straight away, others are asked of the server.
-  const known = knownFrameResult(url);
+  // Known sites are decided straight away, others are asked of the server. Worked out once
+  // per address, so a later cache change can't reload a page that is already showing.
+  const known = useMemo(() => knownFrameResult(url), [url]);
   let status: FrameStatus;
   if (known !== null) status = known ? "ok" : "blocked";
   else if (!frameCheck || frameCheck.url !== url) status = "checking";

@@ -40,7 +40,10 @@ async function askServer(target: string): Promise<boolean> {
       data !== null &&
       (data as { embeddable?: unknown }).embeddable === false
     );
-    if (results.size >= MAX_CACHED) results.clear();
+    if (results.size >= MAX_CACHED) {
+      const oldest = results.keys().next().value;
+      if (oldest !== undefined) results.delete(oldest);
+    }
     results.set(target, embeddable);
     return embeddable;
   } catch {
