@@ -3,12 +3,13 @@
 import React, { useCallback } from "react";
 import type { BrowserTab } from "@/types/browser";
 import { useBrowser } from "@/context/BrowserContext";
+import { NEW_TAB_URL } from "@/lib/url";
 
 export default function ErrorPage({ tab }: { tab: BrowserTab }) {
   const { navigate } = useBrowser();
 
   const retry = useCallback(() => navigate(tab.id, tab.url), [navigate, tab.id, tab.url]);
-  const goHome = useCallback(() => navigate(tab.id, "https://duckduckgo.com"), [navigate, tab.id]);
+  const goHome = useCallback(() => navigate(tab.id, NEW_TAB_URL), [navigate, tab.id]);
 
   return (
     <div style={{

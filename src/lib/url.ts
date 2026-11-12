@@ -1,6 +1,7 @@
 const SEARCH_ENGINES = {
   duckduckgo: "https://duckduckgo.com/?q=",
-  google:     "https://www.google.com/search?q=",
+  // igu=1 asks Google for a version of the page that can be shown inside a frame
+  google:     "https://www.google.com/search?igu=1&q=",
   bing:       "https://www.bing.com/search?q=",
 };
 
@@ -12,10 +13,11 @@ export const NEW_TAB_URL = "about:newtab";
 
 export function resolveInput(
   raw: string,
-  engine: SearchEngine = "duckduckgo"
+  engine: SearchEngine = "google"
 ): string {
   const trimmed = raw.trim();
   if (!trimmed) return "about:blank";
+  if (trimmed === NEW_TAB_URL) return NEW_TAB_URL;
 
   if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
     return sanitizeUrl(trimmed);
@@ -26,6 +28,21 @@ export function resolveInput(
   }
 
   return `${SEARCH_ENGINES[engine]}${encodeURIComponent(trimmed)}`;
+}
+
+// Pages that are known to work inside a frame, so DRIFT can skip the server check
+export function isKnownEmbeddable(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.protocol === "https:" &&
+      (u.hostname === "www.google.com" || u.hostname === "google.com") &&
+      ["/", "/search", "/webhp"].includes(u.pathname) &&
+      u.searchParams.get("igu") === "1"
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function toDisplayUrl(url: string): string {

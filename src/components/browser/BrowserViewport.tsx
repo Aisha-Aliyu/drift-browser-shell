@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useBrowser } from "@/context/BrowserContext";
-import { toDisplayUrl, getFaviconUrl, NEW_TAB_URL } from "@/lib/url";
+import { toDisplayUrl, getFaviconUrl, extractHostname, NEW_TAB_URL } from "@/lib/url";
+import { canShowInFrame, needsFrameCheck } from "@/lib/frameCheck";
 import NewTabPage from "./NewTabPage";
 import ErrorPage from "./ErrorPage";
+import BlockedPage from "./BlockedPage";
 import FindBar from "./FindBar";
 import PageSkeleton from "./PageSkeleton";
 
@@ -35,6 +37,8 @@ export default function BrowserViewport() {
   );
 }
 
+type FrameStatus = "checking" | "ok" | "blocked";
+
 function IframeRenderer({
   tabId,
   url,
@@ -46,6 +50,35 @@ function IframeRenderer({
 }) {
   const { dispatch, iframeRefs } = useBrowser();
   const [iframeReady, setIframeReady] = useState(false);
+  const [frameCheck, setFrameCheck] = useState<{ url: string; embeddable: boolean } | null>(null);
+
+  // Sites that refuse to be framed load as a blank page, so ask the server before loading them
+  const checkNeeded = needsFrameCheck(url);
+  let status: FrameStatus = "ok";
+  if (checkNeeded) {
+    if (!frameCheck || frameCheck.url !== url) status = "checking";
+    else if (!frameCheck.embeddable) status = "blocked";
+  }
+
+  useEffect(() => {
+    if (!checkNeeded) return;
+    let cancelled = false;
+    canShowInFrame(url).then((embeddable) => {
+      if (!cancelled) setFrameCheck({ url, embeddable });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url, checkNeeded]);
+
+  // The blocked page stands in for the site, so finish loading and record the visit
+  useEffect(() => {
+    if (status !== "blocked" || !isLoading) return;
+    const title = extractHostname(url) || "Untitled";
+    const favicon = getFaviconUrl(url) || null;
+    dispatch({ type: "TAB_LOADED", tabId, title, favicon });
+    dispatch({ type: "ADD_HISTORY", entry: { url, title, favicon, tabId } });
+  }, [status, isLoading, url, tabId, dispatch]);
 
   const handleLoad = useCallback(
     (e: React.SyntheticEvent<HTMLIFrameElement>) => {
@@ -86,33 +119,39 @@ function IframeRenderer({
     });
   }, [dispatch, tabId]);
 
+  if (status === "blocked") {
+    return <BlockedPage tabId={tabId} url={url} />;
+  }
+
   return (
     <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
-      {(!iframeReady || isLoading) && (
+      {(status === "checking" || !iframeReady || isLoading) && (
         <div style={{ position: "absolute", inset: 0, zIndex: 2 }}>
           <PageSkeleton />
         </div>
       )}
-      <iframe
-        ref={(el) => { iframeRefs.current[tabId] = el; }}
-        src={url}
-        title="Browser viewport"
-        onLoad={handleLoad}
-        onError={handleError}
-        sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
-        referrerPolicy="no-referrer-when-downgrade"
-        loading="eager"
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          border: "none",
-          background: "white",
-          opacity: iframeReady && !isLoading ? 1 : 0,
-          transition: "opacity 0.2s ease",
-        }}
-      />
+      {status === "ok" && (
+        <iframe
+          ref={(el) => { iframeRefs.current[tabId] = el; }}
+          src={url}
+          title="Browser viewport"
+          onLoad={handleLoad}
+          onError={handleError}
+          sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
+          referrerPolicy="no-referrer-when-downgrade"
+          loading="eager"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            border: "none",
+            background: "white",
+            opacity: iframeReady && !isLoading ? 1 : 0,
+            transition: "opacity 0.2s ease",
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -42,15 +42,23 @@ export function BrowserProvider({ children }: { children: React.ReactNode }) {
     syncCallbacks.current = cb;
   }, []);
 
+  const searchEngine = state.settings.searchEngine;
+  const tabs = state.tabs;
+
   const navigate = useCallback(
     (tabId: TabId, rawInput: string) => {
-      const url = resolveInput(rawInput);
+      const url = resolveInput(rawInput, searchEngine);
       const displayUrl = toDisplayUrl(url);
       const favicon = getFaviconUrl(url);
+      const isSamePage = tabs.find((t) => t.id === tabId)?.url === url;
       dispatch({ type: "NAVIGATE", tabId, url });
       dispatch({ type: "TAB_UPDATE_URL", tabId, url, displayUrl });
+      // A frame whose src doesn't change never fires onLoad, which would leave the loading
+      // screen up, so submitting the page that is already open reloads it
+      const iframe = iframeRefs.current[tabId];
+      if (isSamePage && iframe) iframe.src = url;
     },
-    []
+    [searchEngine, tabs]
   );
 
   const goBack = useCallback((tabId: TabId) => {

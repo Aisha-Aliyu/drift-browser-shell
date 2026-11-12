@@ -5,8 +5,8 @@ import { useBrowser } from "@/context/BrowserContext";
 import type { BrowserSettings } from "@/types/browser";
 
 const ENGINES: { value: BrowserSettings["searchEngine"]; label: string; note: string }[] = [
+  { value: "google",     label: "Google",     note: "Results show inside DRIFT" },
   { value: "duckduckgo", label: "DuckDuckGo", note: "Privacy first" },
-  { value: "google",     label: "Google",     note: "Most popular" },
   { value: "bing",       label: "Bing",       note: "Microsoft"    },
 ];
 

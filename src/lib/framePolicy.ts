@@ -1,0 +1,217 @@
+// Server only. Used by /api/frame-check to decide whether a site can be shown inside
+// DRIFT's frame, without ever connecting to private or internal addresses.
+import * as dns from "node:dns";
+import * as http from "node:http";
+import * as https from "node:https";
+import { isIP } from "node:net";
+import type { LookupFunction } from "node:net";
+
+const MAX_REDIRECTS = 4;
+const USER_AGENT =
+  "Mozilla/5.0 (compatible; DRIFT/1.0; +https://github.com/Aisha-Aliyu/drift-browser-shell)";
+const BLOCKED_HOST_SUFFIXES = [
+  ".localhost", ".local", ".internal", ".lan", ".intranet", ".corp", ".home.arpa",
+];
+
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return true;
+  }
+  const [a, b, c] = parts;
+  return (
+    a === 0 ||                                         // "this" network
+    a === 10 ||                                        // private
+    a === 127 ||                                       // loopback
+    (a === 100 && b >= 64 && b <= 127) ||              // carrier-grade NAT
+    (a === 169 && b === 254) ||                        // link local and cloud metadata
+    (a === 172 && b >= 16 && b <= 31) ||               // private
+    (a === 192 && b === 0 && (c === 0 || c === 2)) ||  // protocol assignments, TEST-NET-1
+    (a === 192 && b === 168) ||                        // private
+    (a === 198 && (b === 18 || b === 19)) ||           // benchmarking
+    (a === 198 && b === 51 && c === 100) ||            // TEST-NET-2
+    (a === 203 && b === 0 && c === 113) ||             // TEST-NET-3
+    a >= 224                                           // multicast and reserved
+  );
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const addr = ip.toLowerCase().split("%")[0];
+  // Covers ::, ::1 and the IPv4-mapped and IPv4-compatible forms
+  if (addr.startsWith("::")) return true;
+  const first = parseInt(addr.split(":")[0], 16);
+  if (Number.isNaN(first)) return true;
+  return (
+    first <= 0x00ff ||               // 0000::/8 reserved, includes NAT64 64:ff9b::/96
+    (first & 0xfe00) === 0xfc00 ||   // fc00::/7 unique local
+    (first & 0xffc0) === 0xfe80 ||   // fe80::/10 link local
+    (first & 0xffc0) === 0xfec0 ||   // fec0::/10 old site local
+    (first & 0xff00) === 0xff00 ||   // ff00::/8 multicast
+    first === 0x2002 ||              // 6to4, which wraps an IPv4 address
+    addr.startsWith("2001:db8:")     // documentation range
+  );
+}
+
+export function isBlockedAddress(ip: string): boolean {
+  const version = isIP(ip);
+  if (version === 4) return isPrivateIPv4(ip);
+  if (version === 6) return isPrivateIPv6(ip);
+  return true;
+}
+
+// Returns the URL only when it is http or https on a standard port and every address
+// it resolves to is public. Anything else returns null.
+export async function toPublicUrl(raw: string): Promise<URL | null> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  if (url.username || url.password) return null;
+  if (url.port && url.port !== "80" && url.port !== "443") return null;
+
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (!host || host === "localhost") return null;
+  if (BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) return null;
+  if (isIP(host)) return isBlockedAddress(host) ? null : url;
+  // A name without a dot only resolves inside a private network
+  if (!host.includes(".")) return null;
+
+  try {
+    const addresses = await dns.promises.lookup(host, { all: true });
+    if (addresses.length === 0 || addresses.some((a) => isBlockedAddress(a.address))) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return url;
+}
+
+function headerValue(value: string | string[] | undefined): string | null {
+  if (value === undefined) return null;
+  return Array.isArray(value) ? value.join(", ") : value;
+}
+
+// null when no policy sets frame-ancestors, otherwise whether every policy allows DRIFT
+export function frameAncestorsAllow(csp: string, selfOrigin: string): boolean | null {
+  const self = selfOrigin.toLowerCase();
+  let found = false;
+  for (const policy of csp.split(",")) {
+    for (const directive of policy.split(";")) {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      if (name.toLowerCase() !== "frame-ancestors") continue;
+      found = true;
+      const allowed = sources.some((source) => {
+        const value = source.toLowerCase().replace(/\/$/, "");
+        return (
+          value === "*" ||
+          value === self ||
+          (value === "https:" && self.startsWith("https:")) ||
+          (value === "http:" && /^https?:/.test(self))
+        );
+      });
+      if (!allowed) return false;
+      // Only the first frame-ancestors directive in a policy counts
+      break;
+    }
+  }
+  return found ? true : null;
+}
+
+// Follows the HTML standard: conflicting values block, and unknown values such as the
+// obsolete ALLOW-FROM are ignored
+export function frameOptionsBlock(value: string | null): boolean {
+  if (!value) return false;
+  const values = new Set(value.split(",").map((v) => v.trim().toLowerCase()));
+  if (values.size > 1) {
+    return values.has("deny") || values.has("sameorigin") || values.has("allowall");
+  }
+  return values.has("deny") || values.has("sameorigin");
+}
+
+export function allowsFraming(headers: http.IncomingHttpHeaders, selfOrigin: string): boolean {
+  const csp = headerValue(headers["content-security-policy"]);
+  if (csp) {
+    const allowed = frameAncestorsAllow(csp, selfOrigin);
+    // Browsers ignore X-Frame-Options when frame-ancestors is set
+    if (allowed !== null) return allowed;
+  }
+  return !frameOptionsBlock(headerValue(headers["x-frame-options"]));
+}
+
+// Runs for the real connection, so a DNS answer that changes after toPublicUrl checked it
+// still can't point the request at an internal address
+const safeLookup: LookupFunction = (hostname, options, callback) => {
+  dns.lookup(hostname, { ...options, all: true as const }, (err, addresses) => {
+    if (err) {
+      callback(err, "", 0);
+      return;
+    }
+    if (addresses.length === 0 || addresses.some((a) => isBlockedAddress(a.address))) {
+      callback(new Error("Address not allowed"), "", 0);
+      return;
+    }
+    if (options.all) {
+      callback(null, addresses);
+    } else {
+      callback(null, addresses[0].address, addresses[0].family);
+    }
+  });
+};
+
+type HeaderResult = { status: number; headers: http.IncomingHttpHeaders };
+
+function fetchHeaders(url: URL, signal: AbortSignal): Promise<HeaderResult> {
+  return new Promise((resolve, reject) => {
+    const options: http.RequestOptions = {
+      method: "GET",
+      agent: false,
+      lookup: safeLookup,
+      signal,
+      headers: { "User-Agent": USER_AGENT, Accept: "text/html,*/*;q=0.8" },
+    };
+    const onResponse = (res: http.IncomingMessage) => {
+      resolve({ status: res.statusCode ?? 0, headers: res.headers });
+      // Only the headers matter, so close the connection before the page downloads
+      res.destroy();
+    };
+    const req =
+      url.protocol === "https:"
+        ? https.request(url, options, onResponse)
+        : http.request(url, options, onResponse);
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+// Follows redirects the way the frame would and reads the final response's headers.
+// Throws when the site can't be reached, so the caller can fall back to trying the frame.
+export async function checkEmbeddable(
+  start: URL,
+  selfOrigin: string,
+  signal: AbortSignal
+): Promise<boolean> {
+  const secureParent = selfOrigin.startsWith("https:");
+  let current = start;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    // A secure page can't load a plain http page in a frame
+    if (secureParent && current.protocol === "http:") return false;
+    // Connections to IP literals skip the DNS lookup, so check those addresses here
+    const host = current.hostname.replace(/^\[|\]$/g, "");
+    if (isIP(host) && isBlockedAddress(host)) throw new Error("Address not allowed");
+
+    const { status, headers } = await fetchHeaders(current, signal);
+    const location = headerValue(headers.location);
+    if (status >= 300 && status < 400 && location) {
+      const next = await toPublicUrl(new URL(location, current).href);
+      if (!next) throw new Error("Redirect to a disallowed address");
+      current = next;
+      continue;
+    }
+    return allowsFraming(headers, selfOrigin);
+  }
+  throw new Error("Too many redirects");
+}
