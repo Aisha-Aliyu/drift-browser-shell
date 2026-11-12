@@ -26,6 +26,22 @@ export const frameCheckGlobalLimiter = new Ratelimit({
   timeout: 2000,
 });
 
+// Fixed one-minute windows kept in memory on this server instance. Only used when Upstash
+// can't be reached, so the frame check stays limited.
+const localWindows = new Map<string, { count: number; resetAt: number }>();
+
+export function localLimit(key: string, max: number, windowMs = 60_000): boolean {
+  const now = Date.now();
+  const entry = localWindows.get(key);
+  if (!entry || entry.resetAt <= now) {
+    if (localWindows.size >= 10_000) localWindows.clear();
+    localWindows.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= max;
+}
+
 export function getIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {

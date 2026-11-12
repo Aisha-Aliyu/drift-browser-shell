@@ -63,26 +63,81 @@ export function isBlockedAddress(ip: string): boolean {
   return true;
 }
 
-// Asks DNS directly with a short timeout instead of using the system lookup, which runs on
-// Node's small thread pool, and stops as soon as the deadline passes
-async function resolveAll(host: string, signal: AbortSignal): Promise<Address[]> {
-  if (signal.aborted) throw new Error("Timed out");
+const PROBE_HOST = "github.com";
+let resolverUsable: Promise<boolean> | null = null;
+
+// Node's DNS resolver avoids the small thread pool that the system lookup runs on, but some
+// hosting setups don't let it reach a nameserver. Check once with a well-known name and use
+// the system lookup when it can't.
+function resolverWorks(): Promise<boolean> {
+  if (!resolverUsable) {
+    const probe = new dns.promises.Resolver({ timeout: DNS_TIMEOUT_MS, tries: 1 });
+    resolverUsable = probe.resolve4(PROBE_HOST).then(
+      (found) => found.length > 0,
+      (err: unknown) => {
+        console.error("[frame-check] DNS resolver unavailable, using the system lookup", err);
+        return false;
+      }
+    );
+  }
+  return resolverUsable;
+}
+
+// Settles with the promise, or rejects as soon as the deadline passes
+function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new Error("Timed out"));
+      return;
+    }
+    const onAbort = () => reject(new Error("Timed out"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      }
+    );
+  });
+}
+
+async function resolveWithResolver(host: string, signal: AbortSignal): Promise<Address[]> {
   const resolver = new dns.promises.Resolver({ timeout: DNS_TIMEOUT_MS, tries: 1 });
   const cancel = () => resolver.cancel();
   signal.addEventListener("abort", cancel, { once: true });
   try {
-    const [v4, v6] = await Promise.allSettled([resolver.resolve4(host), resolver.resolve6(host)]);
-    const addresses: Address[] = [];
-    if (v4.status === "fulfilled") {
-      addresses.push(...v4.value.map((address) => ({ address, family: 4 as const })));
-    }
-    if (v6.status === "fulfilled") {
-      addresses.push(...v6.value.map((address) => ({ address, family: 6 as const })));
-    }
-    return addresses;
+    const v4 = await resolver.resolve4(host).catch(() => [] as string[]);
+    if (v4.length > 0) return v4.map((address) => ({ address, family: 4 as const }));
+    if (signal.aborted) return [];
+    const v6 = await resolver.resolve6(host).catch(() => [] as string[]);
+    return v6.map((address) => ({ address, family: 6 as const }));
   } finally {
     signal.removeEventListener("abort", cancel);
   }
+}
+
+async function resolveWithSystem(host: string, signal: AbortSignal): Promise<Address[]> {
+  const found = await withDeadline(dns.promises.lookup(host, { all: true }), signal).catch(
+    () => [] as dns.LookupAddress[]
+  );
+  const addresses: Address[] = found.map((a) => ({
+    address: a.address,
+    family: a.family === 6 ? (6 as const) : (4 as const),
+  }));
+  const v4 = addresses.filter((a) => a.family === 4);
+  return v4.length > 0 ? v4 : addresses;
+}
+
+// Uses IPv4 addresses when a host has them, and IPv6 only for hosts that have no IPv4
+async function resolveAll(host: string, signal: AbortSignal): Promise<Address[]> {
+  if (signal.aborted) throw new Error("Timed out");
+  return (await resolverWorks())
+    ? resolveWithResolver(host, signal)
+    : resolveWithSystem(host, signal);
 }
 
 // Returns the URL only when it is http or https on a standard port and every address

@@ -1,14 +1,9 @@
-import { isKnownEmbeddable } from "@/lib/url";
+import { isKnownBlocked, isKnownEmbeddable } from "@/lib/url";
 
 const results = new Map<string, boolean>();
 const inFlight = new Map<string, Promise<boolean>>();
 const MAX_CACHED = 200;
 const CHECK_TIMEOUT_MS = 8000;
-
-// False for pages DRIFT can show without asking the server first
-export function needsFrameCheck(url: string): boolean {
-  return /^https?:\/\//i.test(url) && !isKnownEmbeddable(url);
-}
 
 // Only the site's address is sent, never the path, query string or fragment, so search terms
 // and tokens stay private (incognito tabs included) and one-time links aren't used up.
@@ -19,6 +14,15 @@ function checkTarget(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+// The answer when DRIFT already knows it, or null when the server has to be asked
+export function knownFrameResult(url: string): boolean | null {
+  if (!/^https?:\/\//i.test(url) || isKnownEmbeddable(url)) return true;
+  if (isKnownBlocked(url)) return false;
+  const target = checkTarget(url);
+  if (!target) return true;
+  return results.get(target) ?? null;
 }
 
 async function askServer(target: string): Promise<boolean> {
@@ -49,12 +53,10 @@ async function askServer(target: string): Promise<boolean> {
 // Asks the server whether a site can be shown inside a frame. When the check can't run or
 // takes too long, it returns true so the frame still tries to load.
 export async function canShowInFrame(url: string): Promise<boolean> {
-  if (!needsFrameCheck(url)) return true;
+  const known = knownFrameResult(url);
+  if (known !== null) return known;
   const target = checkTarget(url);
   if (!target) return true;
-
-  const cached = results.get(target);
-  if (cached !== undefined) return cached;
 
   let pending = inFlight.get(target);
   if (!pending) {

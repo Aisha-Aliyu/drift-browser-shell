@@ -166,7 +166,7 @@ src/
     useSyncData
   lib/
     url                 URL parsing, sanitization, search engine resolution
-    frameCheck          Client side frame check with a small cache
+    frameCheck          Client side frame check with known sites and a small cache
     framePolicy         Server side header check with private address blocking
     prisma              DB client singleton
     ratelimit           Upstash sliding window rate limiter
@@ -185,13 +185,13 @@ src/
 - Per-user data scoping — every query includes `userId` so users cannot read or delete each other's data
 - Security response headers on all routes — `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`
 - `poweredByHeader: false` in Next.js config removes the `X-Powered-By` response header
-- The public `/api/frame-check` route only returns a yes or no, and it refuses requests that browsers mark as coming from other sites. It is limited to 60 requests per minute per IP and 600 per minute overall, and it refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only a site's address, never the path or query string, and stores nothing
+- The public `/api/frame-check` route only returns a yes or no, and it refuses requests that browsers mark as coming from other sites. It is limited to 60 requests per minute per IP and 600 per minute overall, and it refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only a site's address, never the path or query string, and stores nothing. If Upstash can't be reached, it falls back to limits kept on each server instance instead of running unlimited
 
 ---
 
 ## Known limitations
 
-Cross-origin iframes cannot be scripted by the parent frame. This is a browser security policy, not a limitation of this codebase. Find-in-page works on same-origin content and shows an informative notice on cross-origin sites. Back and forward navigation uses `contentWindow.history` with a try/catch for the same reason. Many sites also block being shown in a frame through `X-Frame-Options` or the CSP `frame-ancestors` directive. Before loading a page, DRIFT asks its own `/api/frame-check` route whether the site allows it, and sites that don't get an "Open in new tab" page instead of a blank frame. Google searches use Google's `igu=1` mode, which can be framed, so results show inside DRIFT. Links followed inside a page can't be checked, so a site that blocks framing can still show the browser's own refusal message there.
+Cross-origin iframes cannot be scripted by the parent frame. This is a browser security policy, not a limitation of this codebase. Find-in-page works on same-origin content and shows an informative notice on cross-origin sites. Back and forward navigation uses `contentWindow.history` with a try/catch for the same reason. Many sites also block being shown in a frame through `X-Frame-Options` or the CSP `frame-ancestors` directive. Before loading a page, DRIFT asks its own `/api/frame-check` route whether the site allows it, and sites that don't get an "Open in new tab" page instead of a blank frame. Popular sites known to block frames, such as GitHub and YouTube, get that page straight away without asking the server. Google searches use Google's `igu=1` mode, which can be framed, so results show inside DRIFT. Links followed inside a page can't be checked, so a site that blocks framing can still show the browser's own refusal message there.
 
 ---
 
