@@ -67,7 +67,7 @@ export default function AddressBar() {
 
   const handleHome = useCallback(() => {
     if (!activeTab) return;
-    navigate(activeTab.id, "https://duckduckgo.com");
+    navigate(activeTab.id, NEW_TAB_URL);
   }, [navigate, activeTab]);
 
   const copyUrl = useCallback(() => {

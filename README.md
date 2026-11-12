@@ -40,11 +40,12 @@ The project started as a portfolio piece but ended up being something I actually
 - Incognito mode — tabs that leave no history
 - Back, forward, reload, stop, home navigation
 - Loading skeleton while pages render
-- Error page with retry for blocked or unreachable sites
+- Error page with retry for unreachable sites
+- Sites that can't be shown in a frame get an "Open in new tab" page instead of a blank screen
 
 **New tab page**
 - Live clock with hours, minutes, and seconds
-- Search bar defaulting to DuckDuckGo
+- Search bar using Google by default, with results shown inside DRIFT
 - Eight quick-access site tiles with hover lift effect
 - Recent history list with visit timestamps
 
@@ -62,7 +63,7 @@ The project started as a portfolio piece but ended up being something I actually
 - Works completely without an account — auth only adds persistence
 
 **Settings**
-- Search engine picker — DuckDuckGo, Google, Bing
+- Search engine picker: Google, DuckDuckGo, Bing
 - Bookmark bar toggle
 - Font size selector
 - Clear history and downloads
@@ -137,6 +138,7 @@ src/
   app/
     api/
       bookmarks/        GET · POST · DELETE
+      frame-check/      GET, says whether a site can be shown in a frame
       history/          GET · POST · DELETE
     sign-in/
     sign-up/
@@ -146,7 +148,8 @@ src/
       TabStrip          Tab row with user avatar
       Tab               Individual tab with context menu
       AddressBar        URL input, nav controls, security badge, settings
-      BrowserViewport   iframe renderer with loading skeleton
+      BrowserViewport   iframe renderer with frame check and loading skeleton
+      BlockedPage       Fallback for sites that can't be shown in a frame
       NewTabPage        Clock, search, quick links, recent history
       Sidebar           History and bookmarks panel
       FindBar           Ctrl+F search overlay
@@ -163,6 +166,8 @@ src/
     useSyncData
   lib/
     url                 URL parsing, sanitization, search engine resolution
+    frameCheck          Client side frame check with a small cache
+    framePolicy         Server side header check with private address blocking
     prisma              DB client singleton
     ratelimit           Upstash sliding window rate limiter
   types/
@@ -180,12 +185,13 @@ src/
 - Per-user data scoping — every query includes `userId` so users cannot read or delete each other's data
 - Security response headers on all routes — `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`
 - `poweredByHeader: false` in Next.js config removes the `X-Powered-By` response header
+- The public `/api/frame-check` route only returns a yes or no, and it refuses requests that browsers mark as coming from other sites. It is limited to 60 requests per minute per IP and 600 per minute overall, and it refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only a site's address, never the path or query string, and stores nothing
 
 ---
 
 ## Known limitations
 
-Cross-origin iframes cannot be scripted by the parent frame. This is a browser security policy, not a limitation of this codebase. Find-in-page works on same-origin content and shows an informative notice on cross-origin sites. Back and forward navigation uses `contentWindow.history` with a try/catch for the same reason. Many sites also block iframe embedding via `X-Frame-Options` headers — these show the error page with a retry button.
+Cross-origin iframes cannot be scripted by the parent frame. This is a browser security policy, not a limitation of this codebase. Find-in-page works on same-origin content and shows an informative notice on cross-origin sites. Back and forward navigation uses `contentWindow.history` with a try/catch for the same reason. Many sites also block being shown in a frame through `X-Frame-Options` or the CSP `frame-ancestors` directive. Before loading a page, DRIFT asks its own `/api/frame-check` route whether the site allows it, and sites that don't get an "Open in new tab" page instead of a blank frame. Google searches use Google's `igu=1` mode, which can be framed, so results show inside DRIFT. Links followed inside a page can't be checked, so a site that blocks framing can still show the browser's own refusal message there.
 
 ---
 

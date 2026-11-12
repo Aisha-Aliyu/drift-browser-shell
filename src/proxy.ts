@@ -5,6 +5,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/",
+  // Guests can browse too, so the frame check can't require sign-in
+  "/api/frame-check",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.1] - 2026-11-12
+
+### Fixed
+- Searches and sites that can't be shown in a frame no longer load as a blank white page. DRIFT checks each site first and shows an "Open in new tab" page when it can't display it.
+- Searches now use the engine picked in Settings. Before, every search went to DuckDuckGo.
+- Pressing Enter on the page that is already open reloads it instead of leaving the loading screen up.
+- Home and "Go home" open the start page instead of DuckDuckGo.
+
+### Changed
+- Google is the default search engine, using Google's frame-friendly mode so results show inside DRIFT.
+- Quick links start with Google and Wikipedia, which work inside DRIFT. Vercel and X were removed.
+
+### Security
+- The new public `/api/frame-check` route only returns a yes or no, refuses requests that browsers mark as coming from other sites, has per-visitor and overall rate limits, and refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only a site's address, never the path or query string.
+
+---
+
 ## [1.0.0] — 2026
 
 ### Added

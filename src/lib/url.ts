@@ -1,6 +1,7 @@
 const SEARCH_ENGINES = {
   duckduckgo: "https://duckduckgo.com/?q=",
-  google:     "https://www.google.com/search?q=",
+  // igu=1 asks Google for a version of the page that can be shown inside a frame
+  google:     "https://www.google.com/search?igu=1&q=",
   bing:       "https://www.bing.com/search?q=",
 };
 
@@ -12,20 +13,53 @@ export const NEW_TAB_URL = "about:newtab";
 
 export function resolveInput(
   raw: string,
-  engine: SearchEngine = "duckduckgo"
+  engine: SearchEngine = "google"
 ): string {
   const trimmed = raw.trim();
   if (!trimmed) return "about:blank";
+  if (trimmed === NEW_TAB_URL) return NEW_TAB_URL;
 
   if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
-    return sanitizeUrl(trimmed);
+    return withFrameMode(sanitizeUrl(trimmed));
   }
 
   if (looksLikeDomain(trimmed)) {
-    return sanitizeUrl(`https://${trimmed}`);
+    return withFrameMode(sanitizeUrl(`https://${trimmed}`));
   }
 
   return `${SEARCH_ENGINES[engine]}${encodeURIComponent(trimmed)}`;
+}
+
+// Google's home and search pages only work inside a frame in igu=1 mode, so typing
+// google.com or pasting a Google search link opens it in that mode
+function withFrameMode(url: string): string {
+  try {
+    const u = new URL(url);
+    const isGoogle = u.hostname === "google.com" || u.hostname === "www.google.com";
+    if (!isGoogle || !["/", "/search", "/webhp"].includes(u.pathname)) return url;
+    u.protocol = "https:";
+    u.hostname = "www.google.com";
+    if (u.pathname === "/") u.pathname = "/webhp";
+    u.searchParams.set("igu", "1");
+    return u.href;
+  } catch {
+    return url;
+  }
+}
+
+// Pages that are known to work inside a frame, so DRIFT can skip the server check
+export function isKnownEmbeddable(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.protocol === "https:" &&
+      (u.hostname === "www.google.com" || u.hostname === "google.com") &&
+      ["/", "/search", "/webhp"].includes(u.pathname) &&
+      u.searchParams.get("igu") === "1"
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function toDisplayUrl(url: string): string {

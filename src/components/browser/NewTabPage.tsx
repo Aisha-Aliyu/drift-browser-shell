@@ -5,13 +5,13 @@ import { useBrowser } from "@/context/BrowserContext";
 import { IconDriftLogo } from "@/components/icons/Icons";
 
 const QUICK_LINKS = [
+  { label: "Google",    url: "https://www.google.com/webhp?igu=1", icon: "https://www.google.com/s2/favicons?domain=google.com&sz=32" },
+  { label: "Wikipedia", url: "https://en.wikipedia.org", icon: "https://www.google.com/s2/favicons?domain=wikipedia.org&sz=32" },
   { label: "GitHub",   url: "https://github.com", icon: "https://www.google.com/s2/favicons?domain=github.com&sz=32"               },
   { label: "YouTube",  url: "https://youtube.com", icon: "https://www.google.com/s2/favicons?domain=youtube.com&sz=32"              },
   { label: "MDN",      url: "https://developer.mozilla.org", icon: "https://www.google.com/s2/favicons?domain=developer.mozilla.org&sz=32"    },
-  { label: "Vercel",   url: "https://vercel.com", icon: "https://www.google.com/s2/favicons?domain=vercel.com&sz=32"               },
   { label: "HN",       url: "https://news.ycombinator.com", icon: "https://www.google.com/s2/favicons?domain=news.ycombinator.com&sz=32"     },
   { label: "Reddit",   url: "https://reddit.com", icon: "https://www.google.com/s2/favicons?domain=reddit.com&sz=32"               },
-  { label: "X",        url: "https://x.com",  icon: "https://www.google.com/s2/favicons?domain=x.com&sz=32"                    },
   { label: "LinkedIn", url: "https://linkedin.com", icon: "https://www.google.com/s2/favicons?domain=linkedin.com&sz=32"             },
 ];
 

@@ -24,7 +24,7 @@ function makeTab(incognito = false): BrowserTab {
 }
 
 const defaultSettings: BrowserSettings = {
-  searchEngine: "duckduckgo",
+  searchEngine: "google",
   showBookmarkBar: true,
   fontSize: "medium",
 };
@@ -72,15 +72,20 @@ export function browserReducer(
     case "ACTIVATE_TAB":
       return { ...state, activeTabId: action.tabId };
 
-    case "NAVIGATE":
+    case "NAVIGATE": {
+      // The start page renders straight away, so it never shows the loading bar
+      const isNewTab = action.url === NEW_TAB_URL;
       return {
         ...state,
         tabs: state.tabs.map((t) =>
           t.id === action.tabId
-            ? { ...t, url: action.url, error: null, isLoading: true }
+            ? isNewTab
+              ? { ...t, url: action.url, error: null, isLoading: false, title: "New Tab", favicon: null }
+              : { ...t, url: action.url, error: null, isLoading: true }
             : t
         ),
       };
+    }
 
     case "TAB_LOADING":
       return {
