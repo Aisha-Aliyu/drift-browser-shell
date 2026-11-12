@@ -1,25 +1,33 @@
 import { isKnownEmbeddable } from "@/lib/url";
 
 const results = new Map<string, boolean>();
+const inFlight = new Map<string, Promise<boolean>>();
 const MAX_CACHED = 200;
+const CHECK_TIMEOUT_MS = 8000;
 
 // False for pages DRIFT can show without asking the server first
 export function needsFrameCheck(url: string): boolean {
   return /^https?:\/\//i.test(url) && !isKnownEmbeddable(url);
 }
 
-// Asks the server whether a site can be shown inside a frame. When the check can't run,
-// it returns true so the frame still tries to load.
-export async function canShowInFrame(url: string): Promise<boolean> {
-  if (!needsFrameCheck(url)) return true;
-
-  const key = url.split("#")[0];
-  const cached = results.get(key);
-  if (cached !== undefined) return cached;
-
+// Only the site and path are sent, never the query string or fragment, so search terms and
+// tokens stay private and one-time links aren't used up by the check
+function checkTarget(url: string): string | null {
   try {
-    const response = await fetch(`/api/frame-check?url=${encodeURIComponent(key)}`, {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    return null;
+  }
+}
+
+async function askServer(target: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+  try {
+    const response = await fetch(`/api/frame-check?url=${encodeURIComponent(target)}`, {
       cache: "no-store",
+      signal: controller.signal,
     });
     if (!response.ok) return true;
     const data: unknown = await response.json();
@@ -29,9 +37,29 @@ export async function canShowInFrame(url: string): Promise<boolean> {
       (data as { embeddable?: unknown }).embeddable === false
     );
     if (results.size >= MAX_CACHED) results.clear();
-    results.set(key, embeddable);
+    results.set(target, embeddable);
     return embeddable;
   } catch {
     return true;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+// Asks the server whether a site can be shown inside a frame. When the check can't run or
+// takes too long, it returns true so the frame still tries to load.
+export async function canShowInFrame(url: string): Promise<boolean> {
+  if (!needsFrameCheck(url)) return true;
+  const target = checkTarget(url);
+  if (!target) return true;
+
+  const cached = results.get(target);
+  if (cached !== undefined) return cached;
+
+  let pending = inFlight.get(target);
+  if (!pending) {
+    pending = askServer(target).finally(() => inFlight.delete(target));
+    inFlight.set(target, pending);
+  }
+  return pending;
 }
