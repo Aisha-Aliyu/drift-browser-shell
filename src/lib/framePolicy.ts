@@ -132,9 +132,11 @@ function sourceAllows(source: string, self: URL): boolean {
   if (value.startsWith("'")) return false;
 
   const match =
-    /^(?:([a-z][a-z0-9+.-]*):\/\/)?(\*|(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*)(?::(\d+|\*))?(?:\/.*)?$/.exec(value);
+    /^(?:([a-z][a-z0-9+.-]*):\/\/)?(\*|(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*)(?::(\d+|\*))?(\/.*)?$/.exec(value);
   if (!match) return false;
-  const [, scheme, host, port] = match;
+  const [, scheme, host, port, path] = match;
+  // DRIFT runs at "/", so a source limited to any other path doesn't match it
+  if (path && path !== "/") return false;
 
   if (scheme && scheme !== selfScheme && !(scheme === "http" && selfScheme === "https")) {
     return false;
@@ -244,8 +246,8 @@ export async function checkEmbeddable(
 ): Promise<boolean> {
   const self = new URL(selfOrigin);
   const selfHost = self.hostname.replace(/\.$/, "");
-  // Only the site and path are requested, so tokens in a query string are never used up
-  let current = new URL(start.origin + start.pathname);
+  // Only the site's front page is requested, so tokens in a path or query string are never used up
+  let current = new URL(start.origin + "/");
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     // A secure page can't load a plain http page in a frame
     if (self.protocol === "https:" && current.protocol === "http:") return false;

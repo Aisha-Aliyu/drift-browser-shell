@@ -185,7 +185,7 @@ src/
 - Per-user data scoping — every query includes `userId` so users cannot read or delete each other's data
 - Security response headers on all routes — `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`
 - `poweredByHeader: false` in Next.js config removes the `X-Powered-By` response header
-- The public `/api/frame-check` route only returns a yes or no and only answers DRIFT's own pages. It is limited to 60 requests per minute per IP and 600 per minute overall, and it refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only the site and path of a page, never the query string, and stores nothing
+- The public `/api/frame-check` route only returns a yes or no, and it refuses requests that browsers mark as coming from other sites. It is limited to 60 requests per minute per IP and 600 per minute overall, and it refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only a site's address, never the path or query string, and stores nothing
 
 ---
 

@@ -10,12 +10,12 @@ export function needsFrameCheck(url: string): boolean {
   return /^https?:\/\//i.test(url) && !isKnownEmbeddable(url);
 }
 
-// Only the site and path are sent, never the query string or fragment, so search terms and
-// tokens stay private and one-time links aren't used up by the check
+// Only the site's address is sent, never the path, query string or fragment, so search terms
+// and tokens stay private (incognito tabs included) and one-time links aren't used up.
+// Sites set their framing rules for the whole site, so one answer covers every page on it.
 function checkTarget(url: string): string | null {
   try {
-    const u = new URL(url);
-    return u.origin + u.pathname;
+    return new URL(url).origin;
   } catch {
     return null;
   }

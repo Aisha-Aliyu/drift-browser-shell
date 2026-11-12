@@ -20,14 +20,31 @@ export function resolveInput(
   if (trimmed === NEW_TAB_URL) return NEW_TAB_URL;
 
   if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
-    return sanitizeUrl(trimmed);
+    return withFrameMode(sanitizeUrl(trimmed));
   }
 
   if (looksLikeDomain(trimmed)) {
-    return sanitizeUrl(`https://${trimmed}`);
+    return withFrameMode(sanitizeUrl(`https://${trimmed}`));
   }
 
   return `${SEARCH_ENGINES[engine]}${encodeURIComponent(trimmed)}`;
+}
+
+// Google's home and search pages only work inside a frame in igu=1 mode, so typing
+// google.com or pasting a Google search link opens it in that mode
+function withFrameMode(url: string): string {
+  try {
+    const u = new URL(url);
+    const isGoogle = u.hostname === "google.com" || u.hostname === "www.google.com";
+    if (!isGoogle || !["/", "/search", "/webhp"].includes(u.pathname)) return url;
+    u.protocol = "https:";
+    u.hostname = "www.google.com";
+    if (u.pathname === "/") u.pathname = "/webhp";
+    u.searchParams.set("igu", "1");
+    return u.href;
+  } catch {
+    return url;
+  }
 }
 
 // Pages that are known to work inside a frame, so DRIFT can skip the server check

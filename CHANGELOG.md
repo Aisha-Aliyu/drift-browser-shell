@@ -18,7 +18,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Quick links start with Google and Wikipedia, which work inside DRIFT. Vercel and X were removed.
 
 ### Security
-- The new public `/api/frame-check` route only returns a yes or no, only answers DRIFT's own pages, has per-visitor and overall rate limits, and refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only the site and path of a page, never the query string.
+- The new public `/api/frame-check` route only returns a yes or no, refuses requests that browsers mark as coming from other sites, has per-visitor and overall rate limits, and refuses private, internal and non-standard-port addresses, including after redirects and DNS changes. It receives only a site's address, never the path or query string.
 
 ---
 
